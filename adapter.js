@@ -3,7 +3,7 @@
 // GitHub Pages preview: the existing UI uses the same API contract, backed by
 // this browser's storage. Nothing here is shared with other visitors.
 (() => {
-  const key = "taf-schedule-preview-v1";
+  const key = "taf-schedule-preview-v2";
   const realFetch = window.fetch.bind(window);
   const day = 86400000;
   const chinaToday = () => {
@@ -17,6 +17,7 @@
   const clone = value => structuredClone(value);
   const error = (status, message) => { throw {status,message}; };
   const seed = () => {
+    if (window.previewSnapshot?.entries?.length) return clone(window.previewSnapshot);
     const today = chinaToday();
     const entries = [];
     const project = (id, brand, name, skuQuantity, assetQuantity, shift, rounds=2) => {
@@ -71,7 +72,7 @@
   };
   const handle = (path,body) => {
     const s=read();
-    if(path==="state") return {entries:s.entries,batches:s.batches,today:chinaToday(),allowAnonymousEdits:true};
+    if(path==="state") return {entries:s.entries,batches:s.batches,sourceStyles:s.sourceStyles||{},today:chinaToday(),allowAnonymousEdits:true};
     if(path.startsWith("history/")) return history(s,path.slice(8));
     if(path==="login") error(401,"预览版使用本地编辑，无需登录");
     let result;
@@ -102,6 +103,7 @@
       if(!Array.isArray(body.entries) || !body.entries.length) error(400,"导入批次缺少记录");
       for(const item of [...body.entries].sort((a,b)=>(a.kind!=="project")-(b.kind!=="project")))
         save(s,item,body.id);
+      if(body.sourceStyles && typeof body.sourceStyles==="object") s.sourceStyles=body.sourceStyles;
       s.batches.unshift({id:body.id,time:now(),undone:0});
       result={count:body.entries.length,duplicate:false};
     } else if(path==="undo") {
@@ -147,7 +149,7 @@
     button.onclick=()=>{
       const s=read();
       const entries=s.entries.map(({version,...entry})=>entry);
-      const blob=new Blob([JSON.stringify({id:"preview-export-"+Date.now(),entries},null,2)],
+      const blob=new Blob([JSON.stringify({id:"preview-export-"+Date.now(),entries,sourceStyles:s.sourceStyles||{}},null,2)],
         {type:"application/json"});
       const link=document.createElement("a");
       link.href=URL.createObjectURL(blob);
