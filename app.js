@@ -673,14 +673,22 @@ function metrics(entries) {
       actual:workdaysBefore(phaseDate(r1[0]),r1LeadDays(project)), r1Date:phaseDate(r1[0]), remainingQuantity}]);
   }
   const asset = started.filter((entry) => entry.kind === "asset");
-  const revision = started.filter((entry) => entry.kind === "revision");
+  const firstR4 = new Map();
+  for (const entry of entries.filter((item) => item.kind === "node" && item.status !== "已取消" && roundNumber(nodeType(item)) >= 4)) {
+    const project = find(entry.project);
+    const date = phaseDate(entry);
+    if (!project || project.status === "已归档" || !date) continue;
+    const previous = firstR4.get(project.id);
+    if (!previous || date < previous.date) firstR4.set(project.id,{project:project.id,name:project.name,brand:project.brand,date,round:nodeType(entry)});
+  }
+  const r4Projects = [...firstR4.values()].filter((item) => inMonth(item.date));
   const pending = entries.filter((entry) => (["sku","asset","revision"].includes(entry.kind) && !entry.actual) ||
     (entry.kind==="node" && entry.source && !entry.actual && inMonth(entry.date) && entry.status==="待确认"));
   const skuCount = [...sku.values()].reduce((sum,items) => sum + (items[0].remainingQuantity || 1),0);
-  return {sku,asset,revision,pending, values:[skuCount,asset.reduce((sum,entry)=>sum+entry.quantity,0),revision.length,pending.length]};
+  return {sku,asset,r4Projects,pending, values:[skuCount,asset.reduce((sum,entry)=>sum+entry.quantity,0),r4Projects.length,pending.length]};
 }
 
-const metricNames = ["新开工 SKU","新开工图片 / 资产","修改轮次","待确认条目"];
+const metricNames = ["新开工 SKU","新开工图片 / 资产","达到 R4 的项目","待确认条目"];
 
 function stats() {
   const brand = find(view.project)?.brand || view.brand;
@@ -715,7 +723,7 @@ function stats() {
   })) : '<p class="empty">本月暂无新开工产品。</p>';
   return '<div class="panel"><div class="section-head"><h2>' + escape(view.month) + ' 月度统计</h2></div>' +
     '<div class="stats-line">' + metricNames.map((name,i) => '<button data-metric="' + i + '">' + name + '<strong>' + total.values[i] + '</strong></button>').join("") + '</div>' +
-    '<p class="hint stats-note">按品牌汇总。项目的 R1 节点落在本月时，按设置的 SKU 数量计入新开工；未设置时至少计 1 个。已录入 SKU 明细按实际开工的不同 SKU 计数。交付资产数量为项目计划值，新开工资产和修改轮次仍按实际记录统计。</p>' +
+    '<p class="hint stats-note">按品牌汇总。项目的 R1 节点落在本月时，按设置的 SKU 数量计入新开工；未设置时至少计 1 个。已录入 SKU 明细按实际开工的不同 SKU 计数。新开工资产按实际记录统计；项目首次排期达到 R4 或更高轮次时，计入对应月份，每个项目只计 1 次。</p>' +
     (rows.length ? table(["品牌", ...metricNames], rows) : '<p class="empty">新建项目后即可录入统计明细。</p>') +
     '<section class="stat-products" aria-label="本月新开工产品"><h3>本月新开工产品 <span>' + productRows.length + '</span></h3>' + productTable + '</section></div>';
 }
@@ -741,7 +749,7 @@ function select(label,name,values,value) {
 
 function sourceLink(value) {
   if (/^imports\/sources\/(?:itc-taf-2026\.png|suave-taf-2026\.jpg|apa-taf-2026\.jpg)$/.test(value)) {
-    return '<a href="/sources/' + escape(value.split("/").pop()) + '" target="_blank" rel="noopener noreferrer">查看来源截图</a>';
+    return '<a href="sources/' + escape(value.split("/").pop()) + '" target="_blank" rel="noopener noreferrer">查看来源截图</a>';
   }
   try {
     const url = new URL(value);
@@ -1338,11 +1346,12 @@ function importDrawer() {
 function metricDrawer(index) {
   const brand = find(view.project)?.brand || view.brand;
   const ids = new Set(projects().filter((p) => p.status !== "已归档" && (!brand || p.brand === brand)).map((p) => p.id));
-  const {sku,asset,revision,pending} = metrics(data.entries.filter((entry) => entry.kind !== "project" && ids.has(entry.project)));
-  const items = [[...sku.values()].flat(),asset,revision,pending][index];
+  const {sku,asset,r4Projects,pending} = metrics(data.entries.filter((entry) => entry.kind !== "project" && ids.has(entry.project)));
+  const items = [[...sku.values()].flat(),asset,r4Projects,pending][index];
   drawer(metricNames[index], '<p class="hint">' + escape(view.month) + ' · ' + escape(brand || "全部品牌") +
     '</p><div class="stack">' +
-    (items.length ? items.map((entry) => openButton(entry,entry.name + " · " + find(entry.project)?.name +
+    (items.length ? items.map((entry) => index === 2 ? openButton(find(entry.project),entry.name + " · " + entry.round + " · " + entry.date) :
+      openButton(entry,entry.name + " · " + find(entry.project)?.name +
       (entry.quantity ? " · " + entry.quantity : "") + (entry.actual ? " · " + entry.actual : " · 待确认"))).join("") :
       '<p class="hint">暂无符合条件的记录。</p>') + '</div>');
 }
