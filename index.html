@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TA-F 排期看板</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>1mageAI</title>
   <link rel="stylesheet" href="style.css">
   <script src="snapshot.js" defer></script>
   <script src="xlsx.js" defer></script>
@@ -11,37 +11,69 @@
   <script src="app.js" defer></script>
 </head>
 <body>
-  <aside class="rail">
-    <div class="identity"><span class="mark" aria-hidden="true"></span><div><strong>TA-F 排期看板</strong><small>TA-F SCHEDULE</small></div></div>
-    <div class="rail-title"><span>项目</span><button id="add-project" type="button">新建项目</button></div>
-    <nav id="projects" aria-label="项目列表"></nav>
-    <button class="import-button" id="import-open" type="button">导入记录</button>
+  <aside class="rail" id="rail">
+    <div class="rail-top">
+      <div class="category-dropdown" id="category-dropdown">
+        <button type="button" class="identity category-trigger" id="category-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="切换排期看板">
+          <span class="mark" aria-hidden="true"></span>
+          <strong id="category-current">Digital Twins</strong>
+          <svg class="category-chevron" width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m5.25 6.25 2.75-2.75 2.75 2.75M5.25 9.75l2.75 2.75 2.75-2.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="category-menu" id="category-menu" role="listbox" aria-label="排期类别">
+          <button type="button" role="option" data-category="" aria-selected="false"><span id="all-category-option">1mageAI</span><small data-category-count=""></small></button>
+          <button type="button" role="option" data-category="digital-twins" aria-selected="true"><span>Digital Twins</span><small data-category-count="digital-twins"></small></button>
+          <button type="button" role="option" data-category="ai-image" aria-selected="false"><span>AI Assets</span><small data-category-count="ai-image"></small></button>
+          <button type="button" role="option" data-category="video" aria-selected="false"><span>CGI Videos</span><small data-category-count="video"></small></button>
+        </div>
+      </div>
+      <div class="mobile-bar-actions mobile-only">
+        <button type="button" class="lang-switch" id="mobile-lang-toggle" data-lang-toggle aria-label="Switch to English">EN</button>
+        <button type="button" class="mobile-projects-btn" id="mobile-projects-btn" aria-expanded="false" aria-controls="rail-drawer">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 4.25h11M2.5 8h11M2.5 11.75h7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span id="mobile-projects-label">项目</span>
+          <small id="mobile-projects-count"></small>
+        </button>
+      </div>
+    </div>
+    <div class="rail-backdrop mobile-only" id="rail-backdrop" hidden></div>
+    <div class="rail-drawer" id="rail-drawer">
+      <div class="rail-drawer-head mobile-only">
+        <strong id="rail-drawer-title">项目列表</strong>
+        <div class="rail-drawer-actions">
+          <button id="add-project-mobile" type="button">+ 新建项目</button>
+          <button id="close-rail-drawer" type="button" aria-label="关闭">✕</button>
+        </div>
+      </div>
+      <div class="rail-title"><span id="rail-projects-label">项目</span><button id="add-project" type="button">新建项目</button></div>
+      <nav id="projects" aria-label="项目列表"></nav>
+      <button class="import-button" id="import-open" type="button">导入记录</button>
+    </div>
   </aside>
-  <main><div class="preview-banner">当前案例快照 · 编辑保存在当前浏览器，不会同步给其他人。请定期使用“导出本机数据”备份。</div>
+  <main><div class="preview-banner" data-preview-banner>当前案例快照 · 编辑保存在当前浏览器，不会同步给其他人。请定期使用“导出本机数据”备份。</div>
     <header class="workspace-head">
       <div><div id="scope" class="scope"></div><h1 id="heading">全部项目</h1></div>
-      <div class="actions"><button id="auth-status" type="button" hidden></button><button id="edit-project" hidden>编辑项目</button><button id="add-project-main" type="button">新建项目</button><button id="add-entry" hidden></button></div>
+      <div class="actions"><button id="lang-toggle" class="lang-switch desktop-only" type="button" data-lang-toggle aria-label="Switch to English">EN</button><button id="auth-status" type="button" hidden></button><button id="edit-brand" type="button" hidden>品牌设置</button><button id="edit-project" hidden>编辑项目</button><button id="add-project-main" type="button">新建项目</button><button id="add-entry" hidden></button></div>
     </header>
-    <nav class="tabs" aria-label="工作区视图">
+    <nav class="tabs" id="view-tabs" aria-label="工作区视图">
       <button data-view="timeline" aria-current="page">排期</button>
       <button data-view="sheet">表单</button>
       <button data-view="stats">统计</button>
     </nav>
     <p class="notice" id="notice" role="status" hidden></p>
-    <section class="toolbar" aria-label="视图筛选">
+    <section class="toolbar" id="view-toolbar" aria-label="视图筛选">
       <div class="period">
         <button id="prev" aria-label="上个月">‹</button><input id="month" type="month" aria-label="查看月份"><button id="next" aria-label="下个月">›</button>
         <button id="today">今天</button>
       </div>
       <div class="filters" id="timeline-controls">
         <select id="status-filter" aria-label="按项目状态筛选"><option value="">项目状态</option></select>
-        <div class="range-control"><span>范围</span><div class="segmented" aria-label="甘特图时间范围">
+        <div class="range-control"><span id="range-label">范围</span><div class="segmented" id="range-switch" aria-label="甘特图时间范围">
           <button data-range="month" aria-pressed="true" title="只显示选中月份">本月</button><button data-range="surrounding" aria-pressed="false" title="显示上月、当月和下月">前后月</button>
         </div></div>
-        <div class="segmented timezone-switch" aria-label="排期显示时区">
+        <div class="segmented timezone-switch" id="timezone-switch" aria-label="排期显示时区">
           <button data-zone="Asia/Shanghai" aria-pressed="true">广州</button><button data-zone="America/New_York" aria-pressed="false">纽约</button>
         </div>
-        <div class="segmented" aria-label="时间尺度">
+        <div class="segmented" id="scale-switch" aria-label="时间尺度">
           <button data-scale="day" aria-pressed="true">日</button><button data-scale="week" aria-pressed="false">周</button><button data-scale="month" aria-pressed="false">月</button>
         </div>
       </div>
@@ -55,11 +87,11 @@
   <dialog id="login-dialog" aria-labelledby="login-title">
     <form id="login-form" class="editor">
       <h2 id="login-title">登录后编辑</h2>
-      <p class="hint">查看排期无需登录。修改内容时请使用你的团队账号。</p>
-      <label>账号<input name="username" autocomplete="username" required></label>
-      <label>密码<input name="password" type="password" autocomplete="current-password" required></label>
+      <p class="hint" id="login-hint">查看排期无需登录。修改内容时请使用你的团队账号。</p>
+      <label><span id="login-user-label">账号</span><input name="username" autocomplete="username" required></label>
+      <label><span id="login-pass-label">密码</span><input name="password" type="password" autocomplete="current-password" required></label>
       <p id="login-error" class="form-error" role="alert" hidden></p>
-      <div class="login-actions"><button id="cancel-login" type="button">取消</button><button class="primary" type="submit">登录并继续</button></div>
+      <div class="login-actions"><button id="cancel-login" type="button">取消</button><button class="primary" id="login-submit" type="submit">登录并继续</button></div>
     </form>
   </dialog>
 </body>

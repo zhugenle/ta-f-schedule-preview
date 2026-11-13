@@ -20,17 +20,20 @@
     if (window.previewSnapshot?.entries?.length) return clone(window.previewSnapshot);
     const today = chinaToday();
     const entries = [];
-    const project = (id, brand, name, skuQuantity, assetQuantity, shift, rounds=2) => {
-      entries.push({id,kind:"project",version:1,brand,name,skuQuantity,assetQuantity,
-        status:"制作中",r1LeadDays:3,roundGapDays:3});
+    const project = (id, brand, name, skuQuantity, assetQuantity, shift, rounds=2, category="digital-twins", deliveryName="PSD 交付") => {
+      entries.push({id,kind:"project",version:1,category,brand,name,
+        ...(category === "digital-twins" ? {skuQuantity} : {}),
+        assetQuantity,status:"制作中",r1LeadDays:3,roundGapDays:3});
       for(let n=1;n<=rounds;n++) entries.push({id:`${id}-r${n}`,kind:"node",version:1,
         project:id,name:`R${n}`,type:`R${n}`,date:addDays(today,shift+(n-1)*5),status:"未开始"});
-      entries.push({id:`${id}-psd`,kind:"node",version:1,project:id,name:"PSD 交付",
+      entries.push({id:`${id}-psd`,kind:"node",version:1,project:id,name:deliveryName,
         type:"delivery",date:addDays(today,shift+rounds*5),status:"未开始"});
     };
     project("demo-one","示例品牌 A","晨光礼盒 · 琥珀色",3,8,-4,3);
     project("demo-two","示例品牌 A","旅行装系列 · 蓝色",2,6,3,2);
     project("demo-three","示例品牌 B","节日包装 · 红色",4,12,-1,2);
+    project("demo-ai","示例品牌 A","夏日场景图组",0,8,-2,2,"ai-image","终稿交付");
+    project("demo-video","示例品牌 B","新品主视觉短片",0,3,1,2,"video","成片交付");
     entries.push({id:"demo-client",kind:"node",version:1,project:"demo-one",name:"客户确认构图",
       type:"client",round:"R2",date:addDays(today,4),status:"待反馈"});
     entries.push({id:"demo-note",kind:"note",version:1,project:"demo-one",name:"首轮视觉方向确认",
@@ -54,10 +57,19 @@
     const index=s.entries.findIndex(item=>item.id===input.id);
     const before=index<0?null:s.entries[index];
     if ((before?.version||0)!==(input.version||0)) error(409,"记录已有更新，请刷新后核对再保存。");
+    if (input.kind==="project" && input.status!=="已归档") {
+      const normalized=input.name.trim().replace(/\s+/g," ").toLowerCase();
+      const category=input.category||"digital-twins";
+      if (s.entries.some(item=>item.kind==="project" && item.id!==input.id && item.status!=="已归档" &&
+          (item.category||"digital-twins")===category && item.name.trim().replace(/\s+/g," ").toLowerCase()===normalized))
+        error(400,"当前类别下这个产品已有项目，请在现有项目中添加节点");
+    }
     if (input.kind!=="project" && !["brand","palette"].includes(input.kind) &&
         !s.entries.some(item=>item.kind==="project" && item.id===input.project))
       error(400,"请先建立所属项目");
-    const after={...input,version:++s.seq};
+    const cleaned={...input};
+    if (cleaned.kind==="project" && (cleaned.category||"digital-twins")!=="digital-twins") delete cleaned.skuQuantity;
+    const after={...cleaned,version:++s.seq};
     if(index<0) s.entries.push(after); else s.entries[index]=after;
     s.changes.push({entry_id:after.id,actor:"预览访客",time:now(),
       before:JSON.stringify(before),after:JSON.stringify(after),batch:batch||null});
@@ -77,6 +89,32 @@
     if(path==="login") error(401,"预览版使用本地编辑，无需登录");
     let result;
     if(path==="entry") result=save(s,body);
+    else if(path==="brand-settings") {
+      const oldBrand=(body?.oldBrand||"").trim();
+      const newBrand=(body?.brand||"").trim();
+      const fullName=(body?.fullName||"").trim();
+      const color=body?.color||"";
+      if(!oldBrand || !newBrand) error(400,"请填写品牌简称");
+      if(newBrand.length>40 || fullName.length>120) error(400,"品牌名称超出长度限制");
+      if(!/^#[0-9a-fA-F]{6}$/.test(color)) error(400,"品牌颜色格式无效");
+      const projects=s.entries.filter(item=>item.kind==="project");
+      const targets=projects.filter(item=>item.brand===oldBrand);
+      if(!targets.length) error(400,"未找到该品牌下的项目，请刷新后重试");
+      if(newBrand.toLowerCase()!==oldBrand.toLowerCase()) {
+        if(projects.some(item=>item.brand.trim().toLowerCase()===newBrand.toLowerCase()) ||
+           s.entries.some(item=>item.kind==="brand" && item.brand.trim().toLowerCase()===newBrand.toLowerCase()))
+          error(400,"该品牌简称已存在，请使用其他简称");
+      }
+      const existing=s.entries.find(item=>item.kind==="brand" && item.brand===oldBrand);
+      if((existing?.version||0)!==(body?.version||0)) error(409,"品牌设置已有更新，请刷新后核对再保存。");
+      let updatedProjects=0;
+      if(newBrand!==oldBrand) {
+        for(const proj of targets) { save(s,{...proj,brand:newBrand}); updatedProjects++; }
+      }
+      const payload={id:existing?.id||body?.id,kind:"brand",name:newBrand,brand:newBrand,color:color.toLowerCase(),version:existing?.version||0};
+      if(fullName) payload.fullName=fullName;
+      result={brand:save(s,payload),updatedProjects};
+    }
     else if(path==="project-plan") {
       const project=save(s,body.project);
       for(const node of [...body.nodes,...(body.sideNodes||[])]) save(s,node);
@@ -144,8 +182,10 @@
   document.addEventListener("DOMContentLoaded",()=>{
     const button=document.createElement("button");
     button.type="button";
-    button.textContent="导出本机数据";
-    button.title="保存当前浏览器中的项目与记录";
+    button.dataset.previewExport="1";
+    const isEn=()=>localStorage.getItem("taf-ui-lang-v1")==="en";
+    button.textContent=isEn()?"Export Local Data":"导出本机数据";
+    button.title=isEn()?"Download projects and logs stored in this browser":"保存当前浏览器中的项目与记录";
     button.onclick=()=>{
       const s=read();
       const entries=s.entries.map(({version,...entry})=>entry);
@@ -153,7 +193,7 @@
         {type:"application/json"});
       const link=document.createElement("a");
       link.href=URL.createObjectURL(blob);
-      link.download="TA-F-预览数据-"+chinaToday()+".json";
+      link.download=(isEn()?"1mageAI-preview-data-":"1mageAI-预览数据-")+chinaToday()+".json";
       link.click();
       setTimeout(()=>URL.revokeObjectURL(link.href),1000);
     };
