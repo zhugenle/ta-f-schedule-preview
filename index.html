@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TA-F 排期看板</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="xlsx.js" defer></script>
+  <script src="adapter.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <aside class="rail">
+    <div class="identity"><span class="mark" aria-hidden="true"></span><div><strong>TA-F 排期看板</strong><small>TA-F SCHEDULE</small></div></div>
+    <div class="rail-title"><span>项目</span><button id="add-project" type="button">新建项目</button></div>
+    <nav id="projects" aria-label="项目列表"></nav>
+    <button class="import-button" id="import-open" type="button">导入记录</button>
+  </aside>
+  <main><div class="preview-banner">GitHub 预览版 · 编辑保存在当前浏览器，不会同步给其他人。请定期使用“导出本机数据”备份。</div>
+    <header class="workspace-head">
+      <div><div id="scope" class="scope"></div><h1 id="heading">全部项目</h1></div>
+      <div class="actions"><button id="auth-status" type="button" hidden></button><button id="edit-project" hidden>编辑项目</button><button id="add-project-main" type="button">新建项目</button><button id="add-entry" hidden></button></div>
+    </header>
+    <nav class="tabs" aria-label="工作区视图">
+      <button data-view="timeline" aria-current="page">排期</button>
+      <button data-view="sheet">表单</button>
+      <button data-view="stats">统计</button>
+    </nav>
+    <p class="notice" id="notice" role="status" hidden></p>
+    <section class="toolbar" aria-label="视图筛选">
+      <div class="period">
+        <button id="prev" aria-label="上个月">‹</button><input id="month" type="month" aria-label="查看月份"><button id="next" aria-label="下个月">›</button>
+        <button id="today">今天</button>
+      </div>
+      <div class="filters" id="timeline-controls">
+        <select id="status-filter" aria-label="按项目状态筛选"><option value="">项目状态</option></select>
+        <div class="range-control"><span>范围</span><div class="segmented" aria-label="甘特图时间范围">
+          <button data-range="month" aria-pressed="true" title="只显示选中月份">本月</button><button data-range="surrounding" aria-pressed="false" title="显示上月、当月和下月">前后月</button>
+        </div></div>
+        <div class="segmented timezone-switch" aria-label="排期显示时区">
+          <button data-zone="Asia/Shanghai" aria-pressed="true">广州</button><button data-zone="America/New_York" aria-pressed="false">纽约</button>
+        </div>
+        <div class="segmented" aria-label="时间尺度">
+          <button data-scale="day" aria-pressed="true">日</button><button data-scale="week" aria-pressed="false">周</button><button data-scale="month" aria-pressed="false">月</button>
+        </div>
+      </div>
+    </section>
+    <section id="content" aria-label="工作区内容" aria-busy="true"></section>
+  </main>
+  <dialog id="drawer" aria-labelledby="drawer-title">
+    <div class="drawer-head"><h2 id="drawer-title"></h2><div class="drawer-head-actions"><button class="primary" type="submit" form="editor" id="drawer-save" hidden>保存</button><button type="button" id="close-drawer">关闭</button></div></div>
+    <div id="drawer-body"></div>
+  </dialog>
+  <dialog id="login-dialog" aria-labelledby="login-title">
+    <form id="login-form" class="editor">
+      <h2 id="login-title">登录后编辑</h2>
+      <p class="hint">查看排期无需登录。修改内容时请使用你的团队账号。</p>
+      <label>账号<input name="username" autocomplete="username" required></label>
+      <label>密码<input name="password" type="password" autocomplete="current-password" required></label>
+      <p id="login-error" class="form-error" role="alert" hidden></p>
+      <div class="login-actions"><button id="cancel-login" type="button">取消</button><button class="primary" type="submit">登录并继续</button></div>
+    </form>
+  </dialog>
+</body>
+</html>
