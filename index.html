@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TA-F 排期看板</title>
   <link rel="stylesheet" href="style.css">
+  <script src="snapshot.js" defer></script>
   <script src="xlsx.js" defer></script>
   <script src="adapter.js" defer></script>
   <script src="app.js" defer></script>
@@ -16,7 +17,7 @@
     <nav id="projects" aria-label="项目列表"></nav>
     <button class="import-button" id="import-open" type="button">导入记录</button>
   </aside>
-  <main><div class="preview-banner">GitHub 预览版 · 编辑保存在当前浏览器，不会同步给其他人。请定期使用“导出本机数据”备份。</div>
+  <main><div class="preview-banner">当前案例快照 · 编辑保存在当前浏览器，不会同步给其他人。请定期使用“导出本机数据”备份。</div>
     <header class="workspace-head">
       <div><div id="scope" class="scope"></div><h1 id="heading">全部项目</h1></div>
       <div class="actions"><button id="auth-status" type="button" hidden></button><button id="edit-project" hidden>编辑项目</button><button id="add-project-main" type="button">新建项目</button><button id="add-entry" hidden></button></div>
